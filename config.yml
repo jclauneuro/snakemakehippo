@@ -1,0 +1,8 @@
+singularity_dir: /project/6007967/akhanf/singularity/bids-apps
+prepdwi_dir: /project/6007967/akhanf/cfmm-bids/data/Khan/SNSX_7T_fresh/deriv/prepdwi_v0.0.12b
+seg_dir: /project/6007967/jclau/zona/segmentations/warped_seg
+bids_dir: /project/6007967/akhanf/cfmm-bids/data/Khan/SNSX_7T_fresh/correct7T.v0.3/gradcorrect_v0.0.3
+
+probtrack:
+    seed_res: 0.7
+    nsamples: 2000
