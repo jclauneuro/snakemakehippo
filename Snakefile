@@ -67,7 +67,7 @@ rule run_diffparc:
         mem_mb = 16000,
         time = 60*6 #6 hrs
     shell:
-        'singularity run {params.app} {input.bids_dir} {params.out_dir} {params.analysis_level} --participant_label {params.participant_label} --parcellate_type {input.parcellate_type} {params.other_opts} &> {log}'
+        'singularity run {params.app} {input.bids_dir} {params.out_dir} {params.analysis_level} --participant_label {params.participant_label} --in_prepdwi_dir {input.in_prepdwi_dir} --parcellate_type {input.parcellate_type} {params.other_opts} &> {log}'
 
 
 
