@@ -29,7 +29,6 @@ hemis = ['L','R']
 target_csv = 'cfg/HarvardOxford_noremap.csv'
 ntargets = 49 #hardcoded right now..
 tmaps = ['{tmap:04}'.format(tmap=t) for t in range(ntargets) ]
-print(tmaps)
 
 #just test with one subject:
 #subjects = subjects[0]
@@ -45,8 +44,7 @@ wildcard_constraints:
 
 rule all:
     input: 
-        connmap = expand('diffparc/sub-{subject}/anat/sub-{subject}_space-T1w_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap.mat',subject=subjects,label=labels,hemi=hemis,seed_res=seed_res,nsamples=nsamples),
-        connmap_npz = expand('diffparc/sub-{subject}/anat/sub-{subject}_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap.npz',subject=subjects,label=labels,hemi=hemis,seed_res=seed_res,nsamples=nsamples,template=template)
+        connmap_group_npz = expand('diffparc/group/group_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap.npz',label=labels,hemi=hemis,seed_res=seed_res,nsamples=nsamples,template=template)
 
 rule gen_parc_cfg:
     input: 'cfg/parcellate_HarvardOxford.cfg'
@@ -129,9 +127,33 @@ rule save_connmap_template_npz:
     script: 'scripts/save_connmap_template_npz.py'
 
 
+rule gather_connmap_group:
+    input:
+        connmap_npz = expand('diffparc/sub-{subject}/anat/sub-{subject}_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap.npz',subject=subjects,allow_missing=True)
+    output:
+        connmap_group_npz = 'diffparc/group/group_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap.npz'
+    run:
+        import numpy as np
+        
+        #load first file to get shape
+        data = np.load(input['connmap_npz'][0])
+        affine = data['affine']
+        mask = data['mask']
+        conn_shape = data['conn'].shape
+        nsubjects = len(input['connmap_npz'])
+        conn_group = np.zeros([nsubjects,conn_shape[0],conn_shape[1]])
+        
+        for i,npz in enumerate(input['connmap_npz']):
+            data = np.load(npz)
+            conn_group[i,:,:] = data['conn']
             
+        #save conn_group, mask and affine
+        np.savez(output['connmap_group_npz'], conn_group=conn_group,mask=mask,affine=affine)
+                    
 
-#this is slow:
+
+
+#this is slow, not used for now..:
 rule merge_connmap:
     input:
         connmap_3d = expand('diffparc/sub-{subject}/anat/sub-{subject}_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap/conn_{tmap}.nii.gz',tmap=tmaps,allow_missing=True)
