@@ -58,6 +58,7 @@ rule import_targets:
     envmodules: 'fsl'
     singularity: config['singularity_neuroglia']
     log: 'logs/import_targets_hcp_mmp_sym/sub-{subject}.log'
+    group: 'pre_track'
     shell:
         'fslmaths {input.lh} -max {input.rh} {output} &> {log}'
 
@@ -65,6 +66,7 @@ rule import_template_seed:
     input: join(config['template_seg_dir'],config['template_seg_nii'])
     output: 'diffparc/template_masks/sub-{template}_hemi-{hemi}_desc-{seed}_mask.nii.gz'
     log: 'logs/import_template_seed/{template}_{seed}_{hemi}.log'
+    group: 'pre_track'
     shell: 'cp -v {input} {output} &> {log}'
 
 
@@ -78,6 +80,7 @@ rule transform_to_subject:
     envmodules: 'ants'
     singularity: config['singularity_neuroglia']
     log: 'logs/transform_to_subject/{template}_sub-{subject}_{seed}_{hemi}.log'
+    group: 'pre_track'
     shell:
         'antsApplyTransforms -d 3 --interpolation NearestNeighbor -i {input.seed} -o {output} -r {input.ref} -t [{input.affine},1] -t {input.invwarp} &> {log}'
     
@@ -94,7 +97,7 @@ rule resample_targets:
         targets_res = 'diffparc/sub-{subject}/masks/lh_rh_targets_dwi.nii.gz'
     singularity: config['singularity_neuroglia']
     log: 'logs/resample_targets/sub-{subject}.log'
-    group: 'split_targets'
+    group: 'pre_track'
     shell:
         'fslmaths {input.dwi} -bin {output.mask} &&'
         'mri_convert {output.mask} -vs {params.seed_resolution} {params.seed_resolution} {params.seed_resolution} {output.mask_res} -rt nearest &&'
@@ -108,6 +111,7 @@ rule resample_seed:
         seed_res = 'diffparc/sub-{subject}/masks/seed_from-{template}_{seed}_{hemi}_resampled.nii.gz',
     singularity: config['singularity_neuroglia']
     log: 'logs/resample_seed/{template}_sub-{subject}_{seed}_{hemi}.log'
+    group: 'pre_track'
     shell:
         'reg_resample -flo {input.seed} -res {output.seed_res} -ref {input.mask_res} -NN 0 &> {log}'
 
@@ -123,7 +127,7 @@ rule split_targets:
         target_seg = 'diffparc/sub-{subject}/targets/{target}.nii.gz'
     singularity: config['singularity_neuroglia']
     log: 'logs/split_targets/sub-{subject}/{target}.log'
-    group: 'split_targets'
+    group: 'pre_track'
     shell:
         'fslmaths {input} -thr {params.target_num} -uthr {params.target_num} {output} &> {log}'
 
@@ -133,6 +137,7 @@ rule gen_targets_txt:
     output:
         target_txt = 'diffparc/sub-{subject}/target_images.txt'
     log: 'logs/get_targets_txt/sub-{subject}.log'
+    group: 'pre_track'
     run:
         f = open(output.target_txt,'w')
         for s in input.target_seg:
