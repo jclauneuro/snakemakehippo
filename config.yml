@@ -8,22 +8,24 @@ prepdwi_dir: /project/6007967/akhanf/cfmm-bids/data/Khan/SNSX_7T_fresh/deriv/pre
 #segmentations in subject native space:
 seed_seg_dir: /project/6007967/jclau/zona/segmentations/warped_seg
 seed_seg_nii: sub-{subject}/binary/sub-{subject}_exprater_{seed}_{hemi}_bin.nii.gz
-seeds:
- - ZI
-hemis:
- - L
- - R
 
 #ants transforms from template building - affine and warp are globbed
 ants_template_dir: /project/6007967/jclau/snsx32/templates/snsx32_v0.2/snsx32_v0.2_i09
 ants_affine_mat: snsx32_v0.2_i09sub-{subject}_acq-MP2RAGE_run-01_T1w*GenericAffine.mat
 ants_warp_nii: snsx32_v0.2_i09sub-{subject}_acq-MP2RAGE_run-01_T1w*[0-9]Warp.nii.gz
+ants_invwarp_nii: snsx32_v0.2_i09sub-{subject}_acq-MP2RAGE_run-01_T1w*[0-9]InverseWarp.nii.gz
 ants_ref_nii: snsx32_v0.2_i09template0.nii.gz
 
 #segmentation in template space for defining groupwise masks (should be same structure as seeds)
-template_seg_dir: /project/6007967/jclau/zona_OSF/OSF/SNSX32NLin2020Asym/binary
+template_seg_dir: /project/6007967/jclau/zona_OSF/OSF_nextrelease
 template_seg_nii: sub-SNSX32NLin2020Asym_hemi-{hemi}_desc-{seed}_mask.nii.gz
-template: snsx32
+template: SNSX32NLin2020Asym
+seeds:
+ - ZI
+ - ZIR
+hemis:
+ - L
+ - R
 
 
 #targets in subject native space
