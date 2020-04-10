@@ -4,37 +4,37 @@ import pandas as pd
 
 configfile: 'config.yml'
 
-prepdwi_dir = config['prepdwi_dir']
-seg_dir = config['seg_dir']
-bids_dir = config['bids_dir']
-singularity_dir = config['singularity_dir']
 
-seed_res = config['probtrack']['seed_res']
-nsamples = config['probtrack']['nsamples']
-
-participants_tsv = join(bids_dir,'participants.tsv')
+#currently this isn't used:
+participants_tsv = join(config['bids_dir'],'participants.tsv')
 subjects_table = pd.read_table(participants_tsv)
 
-#get list of subjects based on seg_dir
-subjects = os.listdir(seg_dir)
+#get list of subjects based on seed_seg_dir
+subjects = os.listdir(config['seed_seg_dir'])
 subjects = [ s.strip('sub-') for s in subjects ]
 subjects = sorted(subjects)
 
-template = 'snsx32'
-ants_template_dir = '/project/6007967/jclau/snsx32/templates/snsx32_v0.2/snsx32_v0.2_i09'
-labels = ['ZI']
-hemis = ['L','R']
+
+#get list of ROIs
+f = open(config['targets_txt'],'r')
+targets = [line.strip() for line in f.readlines()]
+f.close()
+
+#get seeds and hemis from config
+seeds = config['seeds']
+hemis = config['hemis']
 
 
-target_csv = 'cfg/HarvardOxford_noremap.csv'
-ntargets = 49 #hardcoded right now..
-tmaps = ['{tmap:04}'.format(tmap=t) for t in range(ntargets) ]
+
+#for saving data to dropbox (for colab notebook)
+if config['enable_dropbox'] == True:
+    from snakemake.remote.dropbox import RemoteProvider as DropboxRemoteProvider
+    DBox = DropboxRemoteProvider(oauth2_access_token=config['dropbox_token'])
 
 #just test with one subject:
-#subjects = subjects[0]
+if config['test_single_subj'] == True:
+    subjects = subjects[0]
 
-# note: diffparc preprocessing may not be parallel-safe -- could try using shadow rules to enforce isolated temporary directories
-#       for now, when you first run a subject, keep labels and hemis limited to 1 instance..  
 
 wildcard_constraints:
     subject="[a-zA-Z0-9]+"
@@ -44,94 +44,150 @@ wildcard_constraints:
 
 rule all:
     input: 
-        connmap_group_npz = expand('diffparc/group/group_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap.npz',label=labels,hemi=hemis,seed_res=seed_res,nsamples=nsamples,template=template)
+        connmap_group_npz = expand('diffparc/connmap/group_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz',seed=seeds,hemi=hemis,template=config['template'])
 
-rule gen_parc_cfg:
-    input: 'cfg/parcellate_HarvardOxford.cfg'
-    output: 'generated_cfg/parcellate_HarvardOxford_{label}_{hemi}_res-{seed_res}_nsamples-{nsamples}.cfg'
-    params:
-        parcellation_name = '{label}_{hemi}_nsamples-{nsamples}_res-{seed_res}',
-        target_labels_txt = 'cfg/HarvardOxford_noremap.csv',
-        target_mapping_txt = 'cfg/HarvardOxford_noremap.csv',
-        bids_tags = 'seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}',
-        seed_file = 'labels/t1/zona_warped_seg/{label}_{hemi}.nii.gz'
-    shell:
-        'cp -v {input} {output} &&'
-        'echo parcellation_name={params.parcellation_name} >> {output} &&'
-        'echo target_mapping_txt=`realpath {params.target_mapping_txt}` >> {output} &&'
-        'echo target_labels_txt=`realpath {params.target_labels_txt}` >> {output} &&'
-        'echo seed_file={params.seed_file} >> {output} &&'
-        'echo bids_tags={params.bids_tags} >> {output}'
 
-rule copy_seed_to_diffparc:
-    input: join(seg_dir,'sub-{subject}/binary/sub-{subject}_exprater_{label}_{hemi}_bin.nii.gz')
-    output: 'diffparc/work/sub-{subject}/labels/t1/zona_warped_seg/{label}_{hemi}.nii.gz'
-    shell: 'cp -v {input} {output}'
-
-rule run_diffparc:
+rule import_targets:
     input: 
-        bids_dir = bids_dir,
-        in_prepdwi_dir = prepdwi_dir,
-        parcellate_type = 'generated_cfg/parcellate_HarvardOxford_{label}_{hemi}_res-{seed_res}_nsamples-{nsamples}.cfg',
-        seed = 'diffparc/work/sub-{subject}/labels/t1/zona_warped_seg/{label}_{hemi}.nii.gz'
-    output:
-        connmap = 'diffparc/sub-{subject}/anat/sub-{subject}_space-T1w_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap.mat',
-        connmap_4d = 'diffparc/work/sub-{subject}/bedpost.{label}_{hemi}_nsamples-{nsamples}_res-{seed_res}/connMap.4d.nii.gz'
-    params:
-        app = f'{singularity_dir}/khanlab_diffparc-sumo_latest.sif',
-        out_dir = 'diffparc',
-        analysis_level = 'participant',
-        participant_label = '{subject}',
-        other_opts = '--skip_postproc --seed_res {seed_res} --nsamples {nsamples}',
-    log: 'logs/run_diffparc/{subject}_{label}_{hemi}_res-{seed_res}_nsamples-{nsamples}.out'
-    threads: 8
-    resources: 
-        mem_mb = 16000,
-        time = 60*6 #6 hrs
-    shell:
-        'singularity run {params.app} {input.bids_dir} {params.out_dir} {params.analysis_level} --participant_label {params.participant_label} --in_prepdwi_dir {input.in_prepdwi_dir} --parcellate_type {input.parcellate_type} {params.other_opts} &> {log}'
-
-
-rule split_connmap:
-    input: 
-        connmap_4d = 'diffparc/work/sub-{subject}/bedpost.{label}_{hemi}_nsamples-{nsamples}_res-{seed_res}/connMap.4d.nii.gz',
-    params:
-        connmap_3d_dir = 'diffparc/sub-{subject}/anat/sub-{subject}_space-T1w_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap'
-    output:
-        connmap_3d = expand('diffparc/sub-{subject}/anat/sub-{subject}_space-T1w_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap/conn_{tmap}.nii.gz',tmap=tmaps,allow_missing=True)
+        lh = join(config['targets_seg_dir'],config['targets_seg_lh']),
+        rh = join(config['targets_seg_dir'],config['targets_seg_rh'])
+    output: 'diffparc/sub-{subject}/masks/lh_rh_targets_native.nii.gz'
     envmodules: 'fsl'
+    singularity: config['singularity_neuroglia']
+    log: 'logs/import_targets_hcp_mmp_sym/sub-{subject}.log'
+    group: 'pre_track'
     shell:
-        'mkdir -p {params.connmap_3d_dir} && fslsplit {input.connmap_4d} {params.connmap_3d_dir}/conn_ -t'
+        'fslmaths {input.lh} -max {input.rh} {output} &> {log}'
 
+rule import_template_seed:
+    input: join(config['template_seg_dir'],config['template_seg_nii'])
+    output: 'diffparc/template_masks/sub-SNSX32NLin2020Asym_hemi-{hemi}_desc-{seed}_mask.nii.gz'
+    log: 'logs/import_template_seed/{seed}_{hemi}.log'
+    group: 'pre_track'
+    shell: 'cp -v {input} {output} &> {log}'
+
+rule import_seed:
+    input: join(config['seed_seg_dir'],config['seed_seg_nii'])
+    output: 'diffparc/sub-{subject}/masks/seed_{seed}_{hemi}.nii.gz'
+    log: 'logs/import_seed/sub-{subject}_{seed}_{hemi}.log'
+    group: 'pre_track'
+    shell: 'cp -v {input} {output} &> {log}'
+
+rule resample_targets:
+    input: 
+        dwi = join(config['prepdwi_dir'],'bedpost','sub-{subject}','mean_S0samples.nii.gz'),
+        targets = 'diffparc/sub-{subject}/masks/lh_rh_targets_native.nii.gz'
+    params:
+        seed_resolution = config['probtrack']['seed_resolution']
+    output:
+        mask = 'diffparc/sub-{subject}/masks/brain_mask_dwi.nii.gz',
+        mask_res = 'diffparc/sub-{subject}/masks/brain_mask_dwi_resampled.nii.gz',
+        targets_res = 'diffparc/sub-{subject}/masks/lh_rh_targets_dwi.nii.gz'
+    singularity: config['singularity_neuroglia']
+    log: 'logs/resample_targets/sub-{subject}.log'
+    group: 'pre_track'
+    shell:
+        'fslmaths {input.dwi} -bin {output.mask} &&'
+        'mri_convert {output.mask} -vs {params.seed_resolution} {params.seed_resolution} {params.seed_resolution} {output.mask_res} -rt nearest &&'
+        'reg_resample -flo {input.targets} -res {output.targets_res} -ref {output.mask_res} -NN 0  &> {log}'
+
+rule resample_seed:
+    input: 
+        seed = 'diffparc/sub-{subject}/masks/seed_{seed}_{hemi}.nii.gz',
+        mask_res = 'diffparc/sub-{subject}/masks/brain_mask_dwi_resampled.nii.gz'
+    output:
+        seed_res = 'diffparc/sub-{subject}/masks/seed_{seed}_{hemi}_resampled.nii.gz',
+    singularity: config['singularity_neuroglia']
+    log: 'logs/resample_seed/sub-{subject}_{seed}_{hemi}.log'
+    group: 'pre_track'
+    shell:
+        'reg_resample -flo {input.seed} -res {output.seed_res} -ref {input.mask_res} -NN 0 &> {log}'
+
+    
+    
+
+rule split_targets:
+    input: 
+        targets = 'diffparc/sub-{subject}/masks/lh_rh_targets_dwi.nii.gz',
+    params:
+        target_num = lambda wildcards: targets.index('{target}'.format(**wildcards)) + 1
+    output:
+        target_seg = 'diffparc/sub-{subject}/targets/{target}.nii.gz'
+    singularity: config['singularity_neuroglia']
+    log: 'logs/split_targets/sub-{subject}/{target}.log'
+    group: 'pre_track'
+    shell:
+        'fslmaths {input} -thr {params.target_num} -uthr {params.target_num} {output} &> {log}'
+
+rule gen_targets_txt:
+    input:
+        target_seg = expand('diffparc/sub-{subject}/targets/{target}.nii.gz',target=targets,allow_missing=True)
+    output:
+        target_txt = 'diffparc/sub-{subject}/target_images.txt'
+    log: 'logs/get_targets_txt/sub-{subject}.log'
+    group: 'pre_track'
+    run:
+        f = open(output.target_txt,'w')
+        for s in input.target_seg:
+            f.write(f'{s}\n')
+        f.close()
+
+
+rule run_probtrack:
+    input:
+        seed_res = 'diffparc/sub-{subject}/masks/seed_{seed}_{hemi}_resampled.nii.gz',
+        target_txt = 'diffparc/sub-{subject}/target_images.txt',
+        mask = 'diffparc/sub-{subject}/masks/brain_mask_dwi.nii.gz'
+    params:
+        bedpost_merged = join(config['prepdwi_dir'],'bedpost','sub-{subject}','merged'),
+        probtrack_opts = config['probtrack']['opts'],
+        probtrack_dir = 'diffparc/sub-{subject}/probtrack_{seed}_{hemi}'
+    output:
+        target_seg = expand('diffparc/sub-{subject}/probtrack_{seed}_{hemi}/seeds_to_{target}.nii.gz',target=targets,allow_missing=True)
+    singularity: '/project/6007967/akhanf/singularity/bids-apps/khanlab_prepdwi_latest.sif'
+    threads: 4
+    resources: 
+        mem_mb = 16000, #16GB 
+        time = 60*6 #2 hrs
+    log: 'logs/run_probtrack/sub-{subject}_{seed}_{hemi}.log'
+    shell:
+        'probtrackx2 --samples={params.bedpost_merged}  --mask={input.mask} --seed={input.seed_res} ' 
+        '--targetmasks={input.target_txt} --seedref={input.seed_res} --nsamples={config[''probtrack''][''nsamples'']} ' 
+        '--dir={params.probtrack_dir} {params.probtrack_opts} &> {log}'
 
 
 rule transform_conn_to_template:
     input:
-        connmap_3d = 'diffparc/sub-{subject}/anat/sub-{subject}_space-T1w_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap/conn_{tmap}.nii.gz',
-        affine =  lambda wildcards: glob(join(ants_template_dir,'snsx32_v0.2_i09sub-{subject}_acq-MP2RAGE_run-01_T1w*GenericAffine.mat'.format(subject=wildcards.subject))),
-        warp =  lambda wildcards: glob(join(ants_template_dir,'snsx32_v0.2_i09sub-{subject}_acq-MP2RAGE_run-01_T1w*[0-9]Warp.nii.gz'.format(subject=wildcards.subject))),
-        ref = join(ants_template_dir,'snsx32_v0.2_i09template0.nii.gz')
+        connmap_3d = 'diffparc/sub-{subject}/probtrack_{seed}_{hemi}/seeds_to_{target}.nii.gz',
+        affine =  lambda wildcards: glob(join(config['ants_template_dir'],config['ants_affine_mat'].format(subject=wildcards.subject))),
+        warp =  lambda wildcards: glob(join(config['ants_template_dir'],config['ants_warp_nii'].format(subject=wildcards.subject))),
+        ref = join(config['ants_template_dir'],config['ants_ref_nii'])
     output:
-        connmap_3d = 'diffparc/sub-{subject}/anat/sub-{subject}_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap/conn_{tmap}.nii.gz'
+        connmap_3d = 'diffparc/sub-{subject}/probtrack_{seed}_{hemi}/seeds_to_{target}_space-{template}.nii.gz'
     envmodules: 'ants'
+    singularity: config['singularity_neuroglia']
+    log: 'logs/transform_conn_to_template/sub-{subject}_{seed}_{hemi}_{template}/{target}.log'
+    group: 'post_track'
     shell:
-        'antsApplyTransforms -d 3 --interpolation Linear -i {input.connmap_3d} -o {output.connmap_3d} -r {input.ref} -t {input.warp} -t {input.affine}'
+        'antsApplyTransforms -d 3 --interpolation Linear -i {input.connmap_3d} -o {output.connmap_3d} -r {input.ref} -t {input.warp} -t {input.affine} &> {log}'
 
 
 rule save_connmap_template_npz:
     input:
-        connmap_3d = expand('diffparc/sub-{subject}/anat/sub-{subject}_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap/conn_{tmap}.nii.gz',tmap=tmaps,allow_missing=True),
-        mask = join(config['template_seg_dir'],'sub-SNSX32NLin2020Asym_hemi-{hemi}_desc-{label}_mask.nii.gz')
+        connmap_3d = expand('diffparc/sub-{subject}/probtrack_{seed}_{hemi}/seeds_to_{target}_space-{template}.nii.gz',target=targets,allow_missing=True),
+        mask = 'diffparc/template_masks/sub-SNSX32NLin2020Asym_hemi-{hemi}_desc-{seed}_mask.nii.gz'
     output:
-        connmap_npz = 'diffparc/sub-{subject}/anat/sub-{subject}_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap.npz'
+        connmap_npz = 'diffparc/sub-{subject}/connmap/sub-{subject}_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz'
+    log: 'logs/save_connmap_to_template_npz/sub-{subject}_{seed}_{hemi}_{template}.log'
+    group: 'post_track'
     script: 'scripts/save_connmap_template_npz.py'
-
 
 rule gather_connmap_group:
     input:
-        connmap_npz = expand('diffparc/sub-{subject}/anat/sub-{subject}_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap.npz',subject=subjects,allow_missing=True)
+        connmap_npz = expand('diffparc/sub-{subject}/connmap/sub-{subject}_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz',subject=subjects,allow_missing=True)
     output:
-        connmap_group_npz = 'diffparc/group/group_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap.npz'
+        connmap_group_npz = 'diffparc/connmap/group_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz'
+    log: 'logs/gather_connmap_group/{seed}_{hemi}_{template}.log'
     run:
         import numpy as np
         
@@ -149,19 +205,13 @@ rule gather_connmap_group:
             
         #save conn_group, mask and affine
         np.savez(output['connmap_group_npz'], conn_group=conn_group,mask=mask,affine=affine)
-                    
+ 
+                   
+localrules: save_to_dropbox
 
-
-
-#this is slow, not used for now..:
-rule merge_connmap:
-    input:
-        connmap_3d = expand('diffparc/sub-{subject}/anat/sub-{subject}_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap/conn_{tmap}.nii.gz',tmap=tmaps,allow_missing=True)
-    output:
-        connmap_4d = 'diffparc/sub-{subject}/anat/sub-{subject}_space-{template}_res-{seed_res}_seed-{label}_hemi-{hemi}_targets-cortical_nsamples-{nsamples}_connMap_4d.nii.gz'
-    envmodules: 'fsl'
-    shell:
-        'fslmerge -t {output} {input}'
-    
-
-
+rule save_to_dropbox:
+    input: 
+        connmap_group_npz = 'diffparc/connmap/group_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz' if config['enable_dropbox']==True else ''
+    output: 
+        connmap_group_npz_dropbox = DBox.remote('diffparc_hcp/remote/group_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz') if config['enable_dropbox']==True else ''
+    shell: 'cp {input} {output}'
