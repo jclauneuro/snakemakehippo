@@ -39,6 +39,7 @@ targets_seg_rh: sub-{subject}/tmp/rh.native.hcp-mmp.nii.gz
 singularity_neuroglia: /project/6007967/akhanf/singularity/bids-apps/khanlab_neuroglia-core_latest.sif 
 #singularity_neuroglia: docker://khanlab/neuroglia-core:latest  
 
+max_k: 12
 
 #tractography parameters
 probtrack:
@@ -50,4 +51,4 @@ probtrack:
 enable_dropbox: False
 dropbox_token: insert_OAuth2_token_here
 
-test_single_subj: True
+test_single_subj: False

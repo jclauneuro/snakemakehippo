@@ -39,14 +39,11 @@ if config['test_single_subj'] == True:
 wildcard_constraints:
     subject="[a-zA-Z0-9]+"
 
-#this specifies that these rules always run locally (instead of submitting as jobs)
-#localrules: all, gen_parc_cfg, copy_seed_to_diffparc
-
 
 
 rule all:
     input: 
-        connmap_group_npz = expand('diffparc/connmap/group_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz',seed=seeds,hemi=hemis,template=config['template'])
+        clusters = expand('diffparc/clustering/group_space-{template}_seed-{seed}_hemi-{hemi}_method-spectralcosine_k-{k}_cluslabels.nii.gz',seed=seeds,hemi=hemis,template=config['template'],k=range(2,config['max_k']+1))
 
 
 
@@ -72,7 +69,7 @@ rule import_template_seed:
 
 rule transform_to_subject:
     input: 
-        seed = 'diffparc/template_masks/sub-{template}_hemi-{hemi}_desc-{seed}_mask.nii.gz',
+        seed = rules.import_template_seed.output,
         affine = lambda wildcards: glob(join(config['ants_template_dir'],config['ants_affine_mat'].format(**wildcards))),
         invwarp = lambda wildcards: glob(join(config['ants_template_dir'],config['ants_invwarp_nii'].format(**wildcards))),
         ref = 'diffparc/sub-{subject}/masks/lh_rh_targets_native.nii.gz'
@@ -105,7 +102,7 @@ rule resample_targets:
 
 rule resample_seed:
     input: 
-        seed = 'diffparc/sub-{subject}/masks/seed_from-{template}_{seed}_{hemi}.nii.gz',
+        seed = rules.transform_to_subject.output,
         mask_res = 'diffparc/sub-{subject}/masks/brain_mask_dwi_resampled.nii.gz'
     output:
         seed_res = 'diffparc/sub-{subject}/masks/seed_from-{template}_{seed}_{hemi}_resampled.nii.gz',
@@ -147,8 +144,8 @@ rule gen_targets_txt:
 
 rule run_probtrack:
     input:
-        seed_res = 'diffparc/sub-{subject}/masks/seed_from-{template}_{seed}_{hemi}_resampled.nii.gz',
-        target_txt = 'diffparc/sub-{subject}/target_images.txt',
+        seed_res = rules.resample_seed.output,
+        target_txt = rules.gen_targets_txt.output,
         mask = 'diffparc/sub-{subject}/masks/brain_mask_dwi.nii.gz'
     params:
         bedpost_merged = join(config['prepdwi_dir'],'bedpost','sub-{subject}','merged'),
@@ -170,18 +167,21 @@ rule run_probtrack:
 
 rule transform_conn_to_template:
     input:
-        connmap_3d = 'diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}.nii.gz',
+        connmap_3d = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}.nii.gz',target=targets,allow_missing=True),
         affine =  lambda wildcards: glob(join(config['ants_template_dir'],config['ants_affine_mat'].format(subject=wildcards.subject))),
         warp =  lambda wildcards: glob(join(config['ants_template_dir'],config['ants_warp_nii'].format(subject=wildcards.subject))),
         ref = join(config['ants_template_dir'],config['ants_ref_nii'])
     output:
-        connmap_3d = 'diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}_space-{template}.nii.gz'
+        connmap_3d = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}_space-{template}.nii.gz',target=targets,allow_missing=True)
     envmodules: 'ants'
     singularity: config['singularity_neuroglia']
-    log: 'logs/transform_conn_to_template/sub-{subject}_{seed}_{hemi}_{template}/{target}.log'
+    threads: 32
+    resources:
+        mem_mb = 16000
+    log: 'logs/transform_conn_to_template/sub-{subject}_{seed}_{hemi}_{template}.log'
     group: 'post_track'
     shell:
-        'antsApplyTransforms -d 3 --interpolation Linear -i {input.connmap_3d} -o {output.connmap_3d} -r {input.ref} -t {input.warp} -t {input.affine} &> {log}'
+        'ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=2 parallel  --jobs {threads} antsApplyTransforms -d 3 --interpolation Linear -i {{1}} -o {{2}}  -r {input.ref} -t {input.warp} -t {input.affine} &> {log} :::  {input.connmap_3d} :::+ {output.connmap_3d}' 
 
 
 rule save_connmap_template_npz:
@@ -217,8 +217,21 @@ rule gather_connmap_group:
             
         #save conn_group, mask and affine
         np.savez(output['connmap_group_npz'], conn_group=conn_group,mask=mask,affine=affine)
- 
-                   
+     
+rule spectral_clustering:
+    input:
+        connmap_group_npz = 'diffparc/connmap/group_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz'
+    params:
+        max_k = config['max_k']
+    output:
+        cluster_k = expand('diffparc/clustering/group_space-{template}_seed-{seed}_hemi-{hemi}_method-spectralcosine_k-{k}_cluslabels.nii.gz',k=range(2,config['max_k']+1),allow_missing=True)
+    script: 'scripts/spectral_clustering.py'
+        
+     
+    
+
+"""
+               
 localrules: save_to_dropbox
 
 rule save_to_dropbox:
@@ -227,3 +240,5 @@ rule save_to_dropbox:
     output: 
         connmap_group_npz_dropbox = DBox.remote('diffparc_hcp/remote/group_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz') if config['enable_dropbox']==True else ''
     shell: 'cp {input} {output}'
+
+"""
