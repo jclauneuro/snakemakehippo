@@ -156,14 +156,14 @@ rule run_probtrack:
         probtrack_dir = 'diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}'
     output:
         target_seg = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}.nii.gz',target=targets,allow_missing=True)
-    singularity: config['singularity_neuroglia']
-    threads: 4
+    threads: 2
     resources: 
-        mem_mb = 16000, #16GB 
-        time = 120 #2 hrs
+        mem_mb = 8000, 
+        time = 30, #30 mins
+        gpus = 1 #1 gpu
     log: 'logs/run_probtrack/{template}_sub-{subject}_{seed}_{hemi}.log'
     shell:
-        'probtrackx2 --samples={params.bedpost_merged}  --mask={input.mask} --seed={input.seed_res} ' 
+        'probtrackx2_gpu --samples={params.bedpost_merged}  --mask={input.mask} --seed={input.seed_res} ' 
         '--targetmasks={input.target_txt} --seedref={input.seed_res} --nsamples={config[''probtrack''][''nsamples'']} ' 
         '--dir={params.probtrack_dir} {params.probtrack_opts} -V 2  &> {log}'
 
@@ -178,10 +178,11 @@ rule transform_conn_to_template:
         connmap_3d = 'diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}_space-{template}.nii.gz'
     envmodules: 'ants'
     singularity: config['singularity_neuroglia']
+    threads: 2
     log: 'logs/transform_conn_to_template/sub-{subject}_{seed}_{hemi}_{template}/{target}.log'
     group: 'post_track'
     shell:
-        'antsApplyTransforms -d 3 --interpolation Linear -i {input.connmap_3d} -o {output.connmap_3d} -r {input.ref} -t {input.warp} -t {input.affine} &> {log}'
+        'ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS={threads} antsApplyTransforms -d 3 --interpolation Linear -i {input.connmap_3d} -o {output.connmap_3d} -r {input.ref} -t {input.warp} -t {input.affine} &> {log}'
 
 
 rule save_connmap_template_npz:
