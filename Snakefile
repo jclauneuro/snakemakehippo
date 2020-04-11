@@ -153,14 +153,14 @@ rule run_probtrack:
         probtrack_dir = 'diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}'
     output:
         target_seg = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}.nii.gz',target=targets,allow_missing=True)
-    singularity: config['singularity_neuroglia']
-    threads: 4
+    threads: 2
     resources: 
-        mem_mb = 16000, #16GB 
-        time = 120 #2 hrs
+        mem_mb = 8000, 
+        time = 30, #30 mins
+        gpus = 1 #1 gpu
     log: 'logs/run_probtrack/{template}_sub-{subject}_{seed}_{hemi}.log'
     shell:
-        'probtrackx2 --samples={params.bedpost_merged}  --mask={input.mask} --seed={input.seed_res} ' 
+        'probtrackx2_gpu --samples={params.bedpost_merged}  --mask={input.mask} --seed={input.seed_res} ' 
         '--targetmasks={input.target_txt} --seedref={input.seed_res} --nsamples={config[''probtrack''][''nsamples'']} ' 
         '--dir={params.probtrack_dir} {params.probtrack_opts} -V 2  &> {log}'
 
