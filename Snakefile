@@ -26,11 +26,6 @@ hemis = config['hemis']
 
 
 
-#for saving data to dropbox (for colab notebook)
-if config['enable_dropbox'] == True:
-    from snakemake.remote.dropbox import RemoteProvider as DropboxRemoteProvider
-    DBox = DropboxRemoteProvider(oauth2_access_token=config['dropbox_token'])
-
 #just test with one subject:
 if config['test_single_subj'] == True:
     subjects = subjects[0]
@@ -229,16 +224,3 @@ rule spectral_clustering:
         
      
     
-
-"""
-               
-localrules: save_to_dropbox
-
-rule save_to_dropbox:
-    input: 
-        connmap_group_npz = 'diffparc/connmap/group_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz' if config['enable_dropbox']==True else ''
-    output: 
-        connmap_group_npz_dropbox = DBox.remote('diffparc_hcp/remote/group_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz') if config['enable_dropbox']==True else ''
-    shell: 'cp {input} {output}'
-
-"""

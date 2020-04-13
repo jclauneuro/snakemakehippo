@@ -1,10 +1,9 @@
 # Snakemake workflow: Zona Incerta Diffusion Parcellation
 
 [![Snakemake](https://img.shields.io/badge/snakemake-≥3.12.0-brightgreen.svg)](https://snakemake.bitbucket.io)
-[![Build Status](https://travis-ci.org/snakemake-workflows/zona-diffparc.svg?branch=master)](https://travis-ci.org/snakemake-workflows/zona-diffparc)
 
-This is the template for a new Snakemake workflow. Replace this text with a comprehensive description covering the purpose and domain.
-Insert your code into the respective folders, i.e. `scripts`, `rules`, and `envs`. Define the entry point of the workflow in the `Snakefile` and the main configuration in the `config.yaml` file.
+This is a Snakemake workflow for performing connectivity-based segmentation of the zona-incerta using probabilistic tractography.
+It requires pre-processed DWI and bedpost (e.g. from prepdwi), and makes use of transforms from ANTS buildtemplate on the SNSX32 dataset.
 
 ## Authors
 
@@ -12,42 +11,38 @@ Insert your code into the respective folders, i.e. `scripts`, `rules`, and `envs
 
 ## Usage
 
-### Simple
+### Running on Graham
 
-#### Step 1: Install workflow
+#### Step 1: Install neuroglia-helpers
 
-If you simply want to use this workflow, download and extract the [latest release](https://github.com/snakemake-workflows/zona-diffparc/releases).
-If you intend to modify and further extend this workflow or want to work under version control, fork this repository as outlined in [Advanced](#advanced). The latter way is recommended.
-
-In any case, if you use this workflow in a paper, don't forget to give credits to the authors by citing the URL of this repository and, if available, its DOI (see above).
+`snakemake` and `snakemake_slurm` are wrappers in [neuroglia-helpers](http://github.com/khanlab/neuroglia-helpers), make sure you use the `graham_khanlab` cfg file.
 
 #### Step 2: Configure workflow
 
 Configure the workflow according to your needs via editing the file `config.yaml`.
 
-#### Step 3: Execute workflow
+You can set the `test_single_subj` variable to True to reduce computing time when testing.
+
+#### Step 3: 
 
 Test your configuration by performing a dry-run via
 
-    snakemake --use-conda -n
+    snakemake --use-singularity -n
 
-Execute the workflow locally via
+Execute the workflow locally using an interactive job:
+    
+    regularInteractive -g  
 
-    snakemake --use-conda --cores $N
+    snakemake --use-singularity --cores 8 --resources gpus=1
 
-using `$N` cores or run it in a cluster environment via
+To execute the workflow for all subjects, use:
 
-    snakemake --use-conda --cluster qsub --jobs 100
+    snakemake_slurm
 
-or
+To export files to dropbox, use:
+    snakemake -s export_dropbox.smk
 
-    snakemake --use-conda --drmaa --jobs 100
 
-If you not only want to fix the software stack but also the underlying OS, use
-
-    snakemake --use-conda --use-singularity
-
-in combination with any of the modes above.
 See the [Snakemake documentation](https://snakemake.readthedocs.io/en/stable/executable.html) for further details.
 
 # Step 4: Investigate results
@@ -76,4 +71,5 @@ The following recipe provides established best practices for running and extendi
 
 ## Testing
 
-Tests cases are in the subfolder `.test`. They are automtically executed via continuous integration with Travis CI.
+No test cases yet
+
