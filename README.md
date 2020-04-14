@@ -35,9 +35,14 @@ Execute the workflow locally using an interactive job:
 
     snakemake --use-singularity --cores 8 --resources gpus=1
 
-To execute the workflow for all subjects, use:
+To execute the workflow for all subjects, submitting a job for each rule group, use:
 
     snakemake_slurm
+
+Alternatively, you can use the `snakemake_batch` wrapper to submit in N batches (e.g. 32), and submit all the batches at once, using the `gather_connmap_group` rule to split batches:
+
+    snakemake_batch gather_connmap_group 32
+
 
 To export files to dropbox, use:
     snakemake -s export_dropbox.smk
