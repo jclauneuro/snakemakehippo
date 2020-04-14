@@ -114,14 +114,15 @@ rule split_targets:
     input: 
         targets = 'diffparc/sub-{subject}/masks/lh_rh_targets_dwi.nii.gz',
     params:
-        target_num = lambda wildcards: targets.index('{target}'.format(**wildcards)) + 1
+        target_nums = lambda wildcards: [str(i) for i in range(len(targets))]
     output:
-        target_seg = 'diffparc/sub-{subject}/targets/{target}.nii.gz'
+        target_seg = expand('diffparc/sub-{subject}/targets/{target}.nii.gz',target=targets,allow_missing=True)
     singularity: config['singularity_neuroglia']
-    log: 'logs/split_targets/sub-{subject}/{target}.log'
+    log: 'logs/split_targets/sub-{subject}.log'
+    threads: 32 
     group: 'pre_track'
     shell:
-        'fslmaths {input} -thr {params.target_num} -uthr {params.target_num} {output} &> {log}'
+        'parallel  --jobs {threads} fslmaths {input.targets} -thr {{1}} -uthr {{1}} -bin {{2}} &> {log} ::: {params.target_nums} :::+ {output.target_seg}'
 
 rule gen_targets_txt:
     input:
@@ -141,7 +142,8 @@ rule run_probtrack:
     input:
         seed_res = rules.resample_seed.output,
         target_txt = rules.gen_targets_txt.output,
-        mask = 'diffparc/sub-{subject}/masks/brain_mask_dwi.nii.gz'
+        mask = 'diffparc/sub-{subject}/masks/brain_mask_dwi.nii.gz',
+        target_seg = expand('diffparc/sub-{subject}/targets/{target}.nii.gz',target=targets,allow_missing=True)
     params:
         bedpost_merged = join(config['prepdwi_dir'],'bedpost','sub-{subject}','merged'),
         probtrack_opts = config['probtrack']['opts'],
