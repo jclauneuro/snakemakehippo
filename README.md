@@ -15,7 +15,7 @@ It requires pre-processed DWI and bedpost (e.g. from prepdwi), and makes use of 
 
 #### Step 1: Install neuroglia-helpers
 
-`snakemake` and `snakemake_slurm` are wrappers in [neuroglia-helpers](http://github.com/khanlab/neuroglia-helpers), make sure you use the `graham_khanlab` cfg file.
+`snakemake`, `snakemake_slurm` and `snakemake_remotebatch` are wrappers in [neuroglia-helpers](http://github.com/khanlab/neuroglia-helpers), make sure you use the `graham_khanlab` cfg file.
 
 #### Step 2: Configure workflow
 
@@ -29,24 +29,35 @@ Test your configuration by performing a dry-run via
 
     snakemake --use-singularity -n
 
+There are a few different ways to execute the workflow:
+  1. Execute the workflow locally using an interactive job
+  2. Execute the workflow using `snakemake_slurm`
+  3. Execute the workflow using `snakemake_remotebatch` (optimized for slurm/graham)
+
+##### Interactive Job
+
 Execute the workflow locally using an interactive job:
     
     regularInteractive -g  
 
     snakemake --use-singularity --cores 8 --resources gpus=1
 
+##### snakemake_slurm
+
 To execute the workflow for all subjects, submitting a job for each rule group, use:
 
     snakemake_slurm
 
-Alternatively, you can use the `snakemake_batch` wrapper to submit in N batches (e.g. 32), and submit all the batches at once, using the `gather_connmap_group` rule to split batches:
+##### snakemake_remotebatch
 
-    snakemake_batch gather_connmap_group 32
+Alternatively, you can use the `snakemake_remotebatch` wrapper to submit in N batches (e.g. 32), and submit all the batches at once, using the `gather_connmap_group` rule to split batches:
 
+    snakemake_remotebatch gather_connmap_group 32
+
+##### Export to Dropbox
 
 To export files to dropbox, use:
     snakemake -s export_dropbox.smk
-
 
 See the [Snakemake documentation](https://snakemake.readthedocs.io/en/stable/executable.html) for further details.
 
