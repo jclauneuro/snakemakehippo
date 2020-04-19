@@ -18,8 +18,8 @@ ants_ref_nii: snsx32_v0.2_i09template0.nii.gz
 
 #segmentation in template space for defining groupwise masks (should be same structure as seeds)
 template_seg_dir: /project/6007967/jclau/zona_OSF/OSF_nextrelease
-template_seg_nii: sub-SNSX32NLin2020Asym_hemi-{hemi}_desc-{seed}_mask.nii.gz
 template: SNSX32NLin2020Asym
+template_seg_nii: sub-{template}_hemi-{hemi}_desc-{seed}_mask.nii.gz
 seeds:
  - ZI
  - ZIR
