@@ -21,7 +21,6 @@ It requires pre-processed DWI and bedpost (e.g. from prepdwi), and makes use of 
 
 Configure the workflow according to your needs via editing the file `config.yaml`.
 
-You can set the `test_single_subj` variable to True to reduce computing time when testing.
 
 #### Step 3: 
 

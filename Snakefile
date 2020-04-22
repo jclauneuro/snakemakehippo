@@ -22,11 +22,6 @@ hemis = config['hemis']
 
 
 
-#just test with one subject:
-if config['test_single_subj'] == True:
-    subjects = subjects[0]
-
-
 wildcard_constraints:
     subject="[a-zA-Z0-9]+"
 

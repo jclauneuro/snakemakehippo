@@ -48,4 +48,3 @@ probtrack:
 enable_dropbox: False
 dropbox_token: insert_OAuth2_token_here
 
-test_single_subj: False
