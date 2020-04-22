@@ -3,7 +3,7 @@ bids_dir: /project/6007967/akhanf/cfmm-bids/data/Khan/SNSX_7T_fresh/correct7T.v0
 
 prepdwi_dir: /project/6007967/akhanf/cfmm-bids/data/Khan/SNSX_7T_fresh/deriv/prepdwi_v0.0.12b
 
-
+participants_tsv: participants.tsv
 
 #segmentations in subject native space:
 seed_seg_dir: /project/6007967/jclau/zona/segmentations/warped_seg
