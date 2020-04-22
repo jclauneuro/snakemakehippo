@@ -5,14 +5,10 @@ import pandas as pd
 configfile: 'config.yml'
 
 
-#currently this isn't used:
-participants_tsv = join(config['bids_dir'],'participants.tsv')
-subjects_table = pd.read_table(participants_tsv)
-
-#get list of subjects based on seed_seg_dir
-subjects = os.listdir(config['seed_seg_dir'])
+#load participants.tsv file, and strip off sub- from participant_id column
+df = pd.read_table(config['participants_tsv'])
+subjects = df.participant_id.to_list() 
 subjects = [ s.strip('sub-') for s in subjects ]
-subjects = sorted(subjects)
 
 
 #get list of ROIs
@@ -24,11 +20,6 @@ f.close()
 seeds = config['seeds']
 hemis = config['hemis']
 
-
-
-#just test with one subject:
-if config['test_single_subj'] == True:
-    subjects = subjects[0]
 
 
 wildcard_constraints:

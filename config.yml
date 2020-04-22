@@ -1,9 +1,6 @@
-
-bids_dir: /project/6007967/akhanf/cfmm-bids/data/Khan/SNSX_7T_fresh/correct7T.v0.3/gradcorrect_v0.0.3
-
 prepdwi_dir: /project/6007967/akhanf/cfmm-bids/data/Khan/SNSX_7T_fresh/deriv/prepdwi_v0.0.12b
 
-
+participants_tsv: participants.tsv
 
 #segmentations in subject native space:
 seed_seg_dir: /project/6007967/jclau/zona/segmentations/warped_seg
@@ -51,4 +48,3 @@ probtrack:
 enable_dropbox: False
 dropbox_token: insert_OAuth2_token_here
 
-test_single_subj: False

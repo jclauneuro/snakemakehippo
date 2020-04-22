@@ -30,10 +30,6 @@ hemis = config['hemis']
 from snakemake.remote.dropbox import RemoteProvider as DropboxRemoteProvider
 DBox = DropboxRemoteProvider(oauth2_access_token=config['dropbox_token'])
 
-#just test with one subject:
-if config['test_single_subj'] == True:
-    subjects = subjects[0]
-
 
 wildcard_constraints:
     subject="[a-zA-Z0-9]+"
