@@ -11,47 +11,52 @@ It requires pre-processed DWI and bedpost (e.g. from prepdwi), and makes use of 
 
 ## Usage
 
-### Running on Graham
 
-#### Step 1: Install neuroglia-helpers
+### Step 1: Install Snakemake
 
-`snakemake`, `snakemake_slurm` and `snakemake_remotebatch` are wrappers in [neuroglia-helpers](http://github.com/khanlab/neuroglia-helpers), make sure you use the `graham_khanlab` cfg file.
+Install Snakemake using [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html):
+
+    conda create -c bioconda -c conda-forge -n snakemake snakemake
+
+For installation details, see the [instructions in the Snakemake documentation](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html).
+
 
 #### Step 2: Configure workflow
 
-Configure the workflow according to your needs via editing the file `config.yaml`.
+Configure the workflow according to your needs via editing the file `config.yaml`, and editing the `participants.tsv`
 
-
-#### Step 3: 
+#### Step 3: Dry-run
 
 Test your configuration by performing a dry-run via
 
-    snakemake --use-singularity -n
+    snakemake -np
+
+#### Step 4: Execution on graham (compute canada)
 
 There are a few different ways to execute the workflow:
   1. Execute the workflow locally using an interactive job
-  2. Execute the workflow using `snakemake_slurm`
-  3. Execute the workflow using `snakemake_remotebatch` (optimized for slurm/graham)
+  2. Execute the workflow using the `cc-slurm` profile
 
 ##### Interactive Job
 
 Execute the workflow locally using an interactive job:
-    
-    regularInteractive -g  
 
-    snakemake --use-singularity --cores 8 --resources gpus=1
+    salloc --time=3:00:00 --gres=gpu:t4:1 --cpus-per-task=8 --ntasks=1 --mem=32000 --account=YOUR_CC_ACCT srun snakemake --use-singularity --cores 8 --resources gpus=1 mem_mb=32000 
 
-##### snakemake_slurm
+##### Use the cc-slurm profile
 
-To execute the workflow for all subjects, submitting a job for each rule group, use:
+The cc-slurm profile sets up default options for running on compute canada systems. More info in the README here: https://github.com/khanlab/cc-slurm
 
-    snakemake_slurm
+If you haven't used it before, deploy the cc-slurm profile using:
 
-##### snakemake_remotebatch
+    cookiecutter gh:khanlab/cc-slurm -o ~/.config/snakemake -f    
 
-Alternatively, you can use the `snakemake_remotebatch` wrapper to submit in N batches (e.g. 32), and submit all the batches at once, using the `gather_connmap_group` rule to split batches:
+Note: you must have cookiecutter installed (e.g. `pip install cookiecutter`)
 
-    snakemake_remotebatch gather_connmap_group 32
+Then to execute the workflow for all subjects, submitting a job for each rule group, use:
+
+    snakemake --profile cc-slurm
+
 
 ##### Export to Dropbox
 
