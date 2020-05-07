@@ -105,18 +105,21 @@ rule split_targets:
     input: 
         targets = 'diffparc/sub-{subject}/masks/lh_rh_targets_dwi.nii.gz',
     params:
-        target_nums = lambda wildcards: [str(i) for i in range(len(targets))]
-    output:
+        target_nums = lambda wildcards: [str(i) for i in range(len(targets))],
         target_seg = expand('diffparc/sub-{subject}/targets/{target}.nii.gz',target=targets,allow_missing=True)
+    output:
+        target_seg_dir = directory('diffparc/sub-{subject}/targets')
     singularity: config['singularity_neuroglia']
     log: 'logs/split_targets/sub-{subject}.log'
     threads: 32 
     group: 'pre_track'
     shell:
-        'parallel  --jobs {threads} fslmaths {input.targets} -thr {{1}} -uthr {{1}} -bin {{2}} &> {log} ::: {params.target_nums} :::+ {output.target_seg}'
+        'mkdir -p {output} && parallel  --jobs {threads} fslmaths {input.targets} -thr {{1}} -uthr {{1}} -bin {{2}} &> {log} ::: {params.target_nums} :::+ {params.target_seg}'
 
 rule gen_targets_txt:
     input:
+        target_seg_dir = 'diffparc/sub-{subject}/targets'
+    params:
         target_seg = expand('diffparc/sub-{subject}/targets/{target}.nii.gz',target=targets,allow_missing=True)
     output:
         target_txt = 'diffparc/sub-{subject}/target_images.txt'
@@ -124,7 +127,7 @@ rule gen_targets_txt:
     group: 'pre_track'
     run:
         f = open(output.target_txt,'w')
-        for s in input.target_seg:
+        for s in params.target_seg:
             f.write(f'{s}\n')
         f.close()
 
@@ -134,13 +137,13 @@ rule run_probtrack:
         seed_res = rules.resample_seed.output,
         target_txt = rules.gen_targets_txt.output,
         mask = 'diffparc/sub-{subject}/masks/brain_mask_dwi.nii.gz',
-        target_seg = expand('diffparc/sub-{subject}/targets/{target}.nii.gz',target=targets,allow_missing=True)
+        target_seg_dir = 'diffparc/sub-{subject}/targets'
     params:
         bedpost_merged = join(config['prepdwi_dir'],'bedpost','sub-{subject}','merged'),
         probtrack_opts = config['probtrack']['opts'],
-        probtrack_dir = 'diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}'
+        out_target_seg = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}.nii.gz',target=targets,allow_missing=True)
     output:
-        target_seg = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}.nii.gz',target=targets,allow_missing=True)
+        probtrack_dir = directory('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}')
     threads: 2
     resources: 
         mem_mb = 8000, 
@@ -148,34 +151,39 @@ rule run_probtrack:
         gpus = 1 #1 gpu
     log: 'logs/run_probtrack/{template}_sub-{subject}_{seed}_{hemi}.log'
     shell:
-        'probtrackx2_gpu --samples={params.bedpost_merged}  --mask={input.mask} --seed={input.seed_res} ' 
+        'mkdir -p {output.probtrack_dir} && probtrackx2_gpu --samples={params.bedpost_merged}  --mask={input.mask} --seed={input.seed_res} ' 
         '--targetmasks={input.target_txt} --seedref={input.seed_res} --nsamples={config[''probtrack''][''nsamples'']} ' 
-        '--dir={params.probtrack_dir} {params.probtrack_opts} -V 2  &> {log}'
+        '--dir={output.probtrack_dir} {params.probtrack_opts} -V 2  &> {log}'
 
 
 rule transform_conn_to_template:
     input:
-        connmap_3d = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}.nii.gz',target=targets,allow_missing=True),
+        connmap_dir = 'diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}',
         affine =  lambda wildcards: glob(join(config['ants_template_dir'],config['ants_affine_mat'].format(subject=wildcards.subject))),
         warp =  lambda wildcards: glob(join(config['ants_template_dir'],config['ants_warp_nii'].format(subject=wildcards.subject))),
         ref = join(config['ants_template_dir'],config['ants_ref_nii'])
+    params:
+        in_connmap_3d = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}.nii.gz',target=targets,allow_missing=True),
+        out_connmap_3d = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}_warped/seeds_to_{target}_space-{template}.nii.gz',target=targets,allow_missing=True)
     output:
-        connmap_3d = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}_space-{template}.nii.gz',target=targets,allow_missing=True)
+        connmap_dir = directory('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}_warped')
     envmodules: 'ants'
     singularity: config['singularity_neuroglia']
     threads: 32
     resources:
-        mem_mb = 16000
+        mem_mb = 128000
     log: 'logs/transform_conn_to_template/sub-{subject}_{seed}_{hemi}_{template}.log'
     group: 'post_track'
     shell:
-        'ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=2 parallel  --jobs {threads} antsApplyTransforms -d 3 --interpolation Linear -i {{1}} -o {{2}}  -r {input.ref} -t {input.warp} -t {input.affine} &> {log} :::  {input.connmap_3d} :::+ {output.connmap_3d}' 
+        'mkdir -p {output} && ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=2 parallel  --jobs {threads} antsApplyTransforms -d 3 --interpolation Linear -i {{1}} -o {{2}}  -r {input.ref} -t {input.warp} -t {input.affine} &> {log} :::  {params.in_connmap_3d} :::+ {params.out_connmap_3d}' 
 
 
 rule save_connmap_template_npz:
     input:
-        connmap_3d = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}/seeds_to_{target}_space-{template}.nii.gz',target=targets,allow_missing=True),
-        mask = 'diffparc/template_masks/sub-{template}_hemi-{hemi}_desc-{seed}_mask.nii.gz'
+        mask = 'diffparc/template_masks/sub-{template}_hemi-{hemi}_desc-{seed}_mask.nii.gz',
+        connmap_dir = 'diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}_warped'
+    params:
+        connmap_3d = expand('diffparc/sub-{subject}/probtrack_{template}_{seed}_{hemi}_warped/seeds_to_{target}_space-{template}.nii.gz',target=targets,allow_missing=True),
     output:
         connmap_npz = 'diffparc/sub-{subject}/connmap/sub-{subject}_space-{template}_seed-{seed}_hemi-{hemi}_connMap.npz'
     log: 'logs/save_connmap_to_template_npz/sub-{subject}_{seed}_{hemi}_{template}.log'
