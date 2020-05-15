@@ -57,6 +57,9 @@ Then to execute the workflow for all subjects, submitting a job for each rule gr
 
     snakemake --profile cc-slurm
 
+snakemake -np
+snakemake --dag | dot -Tpdf > dag.pdf
+snakemake --profile cc-slurm --use-singularity
 
 ##### Export to Dropbox
 
