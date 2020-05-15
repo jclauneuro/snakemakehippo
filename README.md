@@ -2,7 +2,7 @@
 
 [![Snakemake](https://img.shields.io/badge/snakemake-≥3.12.0-brightgreen.svg)](https://snakemake.bitbucket.io)
 
-This is a Snakemake workflow for propagating hippocampal segmentations from Jordan Dekraker's AutoTop: https://github.com/jordandekraker/Hippocampal_AutoTop
+This is a Snakemake workflow for propagating hippocampal segmentations from Jordan DeKraker's AutoTop (@jordandekraker): https://github.com/jordandekraker/Hippocampal_AutoTop
 It requires pre-processed T2SPACE data, and makes use of transforms from ANTS buildtemplate on the SNSX32 dataset.
 
 ## Authors
@@ -57,9 +57,12 @@ Then to execute the workflow for all subjects, submitting a job for each rule gr
 
     snakemake --profile cc-slurm
 
+In summary, a useful series of commands leading up to submission on a cluster:
+```
 snakemake -np
 snakemake --dag | dot -Tpdf > dag.pdf
 snakemake --profile cc-slurm --use-singularity
+```
 
 ##### Export to Dropbox
 
