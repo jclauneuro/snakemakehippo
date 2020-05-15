@@ -1,13 +1,13 @@
-# Snakemake workflow: Zona Incerta Diffusion Parcellation
+# Snakemake workflow for SNSX32 hippocampal template creation.
 
 [![Snakemake](https://img.shields.io/badge/snakemake-≥3.12.0-brightgreen.svg)](https://snakemake.bitbucket.io)
 
-This is a Snakemake workflow for performing connectivity-based segmentation of the zona-incerta using probabilistic tractography.
-It requires pre-processed DWI and bedpost (e.g. from prepdwi), and makes use of transforms from ANTS buildtemplate on the SNSX32 dataset.
+This is a Snakemake workflow for propagating hippocampal segmentations from Jordan Dekraker's AutoTop: https://github.com/jordandekraker/Hippocampal_AutoTop
+It requires pre-processed T2SPACE data, and makes use of transforms from ANTS buildtemplate on the SNSX32 dataset.
 
 ## Authors
 
-* Ali Khan (@akhanf)
+* Jonathan C. Lau (@jclauneuro)
 
 ## Usage
 
